@@ -1,17 +1,25 @@
-import express from "express";
+/*import express from "express";
 import cors from "cors";
 import { Resend } from "resend";
 
 const app = express();
-app.use(cors());
+
+// Allow all origins
+app.use(cors({
+  origin: "*"  
+}));
+
 app.use(express.json());
 
-//const resend = new Resend(re_NbQi6b4m_HEwsDayRh7PWzyfbuzaC1Pcb);
+// Initialize Resend with API key
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 app.post("/send-csv", async (req, res) => {
   try {
     const { csvContent, filename } = req.body;
+
+    // Convert CSV content to base64 for safe email attachment
+    const base64Content = Buffer.from(csvContent, "utf-8").toString("base64");
 
     await resend.emails.send({
       from: "Ride Logger <onboarding@resend.dev>",
@@ -21,6 +29,53 @@ app.post("/send-csv", async (req, res) => {
       attachments: [
         {
           filename,
+          type: "text/csv",        // ensures email client recognizes it as CSV
+          content: base64Content,  // base64-encoded content
+          encoding: "base64",      // required to decode correctly
+        },
+      ],
+    });
+
+    res.status(200).json({ message: "Email sent successfully!" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to send email." });
+  }
+});
+
+app.get("/", (req, res) => {
+  res.send("Ride Logger Backend Running");
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Backend running on port ${PORT}`);
+});*/
+import express from "express";
+import cors from "cors";
+import { Resend } from "resend";
+
+const app = express();
+app.use(cors({ origin: "*" }));
+app.use(express.json({ limit: "5mb" })); // ensure large CSVs work
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+app.post("/send-csv", async (req, res) => {
+  try {
+    const { csvContent, filename } = req.body;
+
+    // **Important:** DO NOT convert to base64 manually
+    // Resend will handle the attachment encoding properly
+    await resend.emails.send({
+      from: "Ride Logger <onboarding@resend.dev>",
+      to: "vipul.prajapati74@gmail.com",
+      subject: `Ride Log CSV - ${filename}`,
+      text: "Attached is the exported CSV file.",
+      attachments: [
+        {
+          filename,
+          type: "text/csv; charset=utf-8", // tell email client it's UTF-8
           content: csvContent,
         },
       ],
@@ -41,7 +96,4 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);
 });
-
-
-
 
