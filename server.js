@@ -50,7 +50,8 @@ app.get("/", (req, res) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);
-});*/
+});*
+====================================================================================
 import express from "express";
 import cors from "cors";
 import { Resend } from "resend";
@@ -95,5 +96,55 @@ app.get("/", (req, res) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);
+});*/
+
+import express from "express";
+import cors from "cors";
+import { Resend } from "resend";
+
+const app = express();
+app.use(cors({ origin: "*" }));
+app.use(express.json({ limit: "5mb" }));
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+app.post("/send-csv", async (req, res) => {
+  try {
+    const { csvContent, filename } = req.body;
+
+    // Convert CSV string to UTF-8 Buffer, then base64
+    const buffer = Buffer.from(csvContent, "utf-8");
+    const base64Content = buffer.toString("base64");
+
+    await resend.emails.send({
+      from: "Ride Logger <onboarding@resend.dev>",
+      to: "vipul.prajapati74@gmail.com",
+      subject: `Ride Log CSV - ${filename}`,
+      text: "Attached is the exported CSV file.",
+      attachments: [
+        {
+          filename,
+          type: "text/csv; charset=utf-8",
+          content: base64Content,
+          encoding: "base64",   // VERY IMPORTANT
+        },
+      ],
+    });
+
+    res.status(200).json({ message: "Email sent successfully!" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to send CSV." });
+  }
 });
+
+app.get("/", (req, res) => {
+  res.send("Ride Logger Backend Running");
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Backend running on port ${PORT}`);
+});
+
 
