@@ -6,7 +6,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const resend = new Resend(re_NbQi6b4m_HEwsDayRh7PWzyfbuzaC1Pcb);
+//const resend = new Resend(re_NbQi6b4m_HEwsDayRh7PWzyfbuzaC1Pcb);
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 app.post("/send-csv", async (req, res) => {
   try {
