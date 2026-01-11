@@ -147,8 +147,8 @@ app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);
 });
 */
-
-
+//====================================================================================
+/*
 import express from "express";
 import cors from "cors";
 
@@ -159,9 +159,7 @@ app.use(express.json());
 // TEMP storage (replace with DB later)
 let storedDescriptor = null;
 
-/**
- * REGISTER FACE
- */
+
 app.post("/register-face", (req, res) => {
   const { descriptor } = req.body;
 
@@ -175,9 +173,6 @@ app.post("/register-face", (req, res) => {
   res.json({ success: true });
 });
 
-/**
- * VERIFY FACE
- */
 app.post("/verify-face", (req, res) => {
   const { descriptor } = req.body;
 
@@ -192,10 +187,104 @@ app.post("/verify-face", (req, res) => {
 
 /*app.listen(5000, () => {
   console.log("Face auth server running on port 5000");
-});*/
+});*//*
 // ✅ Use dynamic port for Render
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Face auth server running on port ${PORT}`);
+});*/
+
+//==================================================================================================
+import express from "express";
+import cors from "cors";
+import nodemailer from "nodemailer";
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const PORT = process.env.PORT || 5000;
+
+// TEMP storage for registered faces (replace with DB in production)
+let pendingRegistrations = []; // { email, descriptor }
+let approvedDescriptors = [];  // Float32Array descriptors
+
+// --- Configure Nodemailer ---
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "vipul.prajapati74@gmail.com", // your Gmail
+    pass: "ixcu hdxp ucey tgrw"           // Gmail App Password
+  }
 });
+
+// --- Send approval email ---
+const sendApprovalEmail = (email, index) => {
+  const mailOptions = {
+    from: "vipul.prajapati74@gmail.com",
+    to: "vipul.prajapati74@gmail.com", // admin receives the request
+    subject: "New Face Registration Request",
+    text: `User ${email} wants to register a face.
+Approve here: https://ride-logger-backend-2.onrender.com/approve-face/${index}`
+  };
+
+  transporter.sendMail(mailOptions, (err, info) => {
+    if (err) console.error("Email error:", err);
+    else console.log("Approval email sent:", info.response);
+  });
+};
+
+// --- Register face request ---
+app.post("/register-face", (req, res) => {
+  const { email, descriptor } = req.body;
+
+  if (!email || !descriptor || descriptor.length !== 128)
+    return res.status(400).json({ error: "Invalid data" });
+
+  // Save pending registration
+  pendingRegistrations.push({ email, descriptor });
+  const index = pendingRegistrations.length - 1;
+
+  // Send admin approval email
+  sendApprovalEmail(email, index);
+
+  res.json({ success: true, message: "Face registration request sent for approval" });
+});
+
+// --- Admin approves face ---
+app.get("/approve-face/:index", (req, res) => {
+  const index = parseInt(req.params.index);
+  if (isNaN(index) || !pendingRegistrations[index]) return res.send("Invalid request");
+
+  const { descriptor } = pendingRegistrations[index];
+  approvedDescriptors.push(new Float32Array(descriptor));
+
+  // Remove from pending
+  pendingRegistrations.splice(index, 1);
+
+  res.send("✅ Face approved! User can now unlock the app.");
+});
+
+// --- Verify face ---
+app.post("/verify-face", (req, res) => {
+  const { descriptor } = req.body;
+  if (!descriptor) return res.status(400).json({ error: "No descriptor provided" });
+
+  const fd = new Float32Array(descriptor);
+
+  let matched = false;
+  for (const saved of approvedDescriptors) {
+    const distance = require("face-api.js").euclideanDistance(fd, saved);
+    if (distance < 0.6) {
+      matched = true;
+      break;
+    }
+  }
+
+  if (matched) res.json({ success: true });
+  else res.status(401).json({ error: "Face not recognized" });
+});
+
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
 
