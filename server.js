@@ -197,97 +197,135 @@ app.listen(PORT, () => {
 //==================================================================================================
 import express from "express";
 import cors from "cors";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import * as faceapi from "face-api.js";
-import dotenv from "dotenv";
-dotenv.config();
-
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 
-// In-memory storage
-let pendingRegistrations = []; // { email, descriptor }
-let approvedDescriptors = [];
+// --------------------
+// TEMP STORAGE (use DB later)
+// --------------------
+let pendingRegistrations = [];   // { email, descriptor }
+let approvedDescriptors = [];    // Float32Array
 
-// --- Nodemailer ---
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.ADMIN_EMAIL,
-    pass: process.env.ADMIN_EMAIL_PASS
+// --------------------
+// RESEND CONFIG
+// --------------------
+const resend = new Resend(process.env.RESEND_API_KEY);
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+
+// --------------------
+// SEND APPROVAL EMAIL
+// --------------------
+const sendApprovalEmail = async (userEmail, index) => {
+  const approveLink = `https://ride-logger-backend-2.onrender.com/approve-face/${index}`;
+
+  try {
+    await resend.emails.send({
+      from: "Ride Logger <onboarding@resend.dev>",
+      to: ADMIN_EMAIL,
+      subject: "New Face Registration Request",
+      html: `
+        <h2>New Face Registration</h2>
+        <p><b>User Email:</b> ${userEmail}</p>
+        <p>Click below to approve the face:</p>
+        <a href="${approveLink}" style="padding:10px 15px;background:#22c55e;color:white;text-decoration:none;border-radius:5px;">
+          ✅ Approve Face
+        </a>
+      `
+    });
+
+    console.log("✅ Approval email sent");
+  } catch (error) {
+    console.error("❌ Email send error:", error);
   }
-});
-
-transporter.verify((err) => {
-  if (err) console.error("❌ Email transporter error:", err);
-  else console.log("✅ Email server ready");
-});
-
-// --- Send approval email ---
-const sendApprovalEmail = (email, index) => {
-  transporter.sendMail({
-    from: process.env.ADMIN_EMAIL,
-    to: process.env.ADMIN_EMAIL_PASS,
-    subject: "New Face Registration Request",
-    text: `User ${email} wants to register a face.
-
-Approve here:
-https://ride-logger-backend-2.onrender.com/approve-face/${index}`
-  }, (err, info) => {
-    if (err) console.error("❌ Email send error:", err);
-    else console.log("✅ Approval email sent:", info.response);
-  });
 };
 
-// --- Register face ---
-app.post("/register-face", (req, res) => {
+// --------------------
+// REGISTER FACE (PENDING)
+// --------------------
+app.post("/register-face", async (req, res) => {
   const { email, descriptor } = req.body;
 
   if (!email || !descriptor || descriptor.length !== 128) {
-    return res.status(400).json({ error: "Invalid data" });
+    return res.status(400).json({ error: "Invalid face data" });
   }
 
   pendingRegistrations.push({ email, descriptor });
   const index = pendingRegistrations.length - 1;
 
-  sendApprovalEmail(email, index);
+  await sendApprovalEmail(email, index);
 
-  res.json({ success: true });
+  res.json({
+    success: true,
+    message: "Face registration request sent for admin approval"
+  });
 });
 
-// --- Approve face ---
+// --------------------
+// ADMIN APPROVES FACE
+// --------------------
 app.get("/approve-face/:index", (req, res) => {
   const index = parseInt(req.params.index);
-  if (!pendingRegistrations[index]) return res.send("Invalid request");
+
+  if (isNaN(index) || !pendingRegistrations[index]) {
+    return res.send("❌ Invalid or expired approval link");
+  }
 
   const { descriptor } = pendingRegistrations[index];
   approvedDescriptors.push(new Float32Array(descriptor));
+
   pendingRegistrations.splice(index, 1);
 
-  res.send("✅ Face approved! User can now unlock the app.");
+  res.send("✅ Face approved successfully! User can now unlock.");
 });
 
-// --- Verify face ---
+// --------------------
+// VERIFY FACE (UNLOCK)
+// --------------------
 app.post("/verify-face", (req, res) => {
   const { descriptor } = req.body;
-  if (!descriptor) return res.status(400).json({ error: "No descriptor" });
 
-  const input = new Float32Array(descriptor);
-
-  for (const saved of approvedDescriptors) {
-    const distance = faceapi.euclideanDistance(input, saved);
-    if (distance < 0.6) return res.json({ success: true });
+  if (!descriptor || descriptor.length !== 128) {
+    return res.status(400).json({ error: "Invalid face descriptor" });
   }
 
-  res.status(401).json({ error: "Face not recognized" });
+  const incoming = new Float32Array(descriptor);
+
+  let matched = false;
+
+  for (const saved of approvedDescriptors) {
+    const distance = faceapi.euclideanDistance(incoming, saved);
+    if (distance < 0.6) {
+      matched = true;
+      break;
+    }
+  }
+
+  if (matched) {
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ error: "Face not recognized" });
+  }
 });
 
-app.listen(PORT, () =>
-  console.log(`🚀 Server running on port ${PORT}`)
-);
+// --------------------
+// HEALTH CHECK
+// --------------------
+app.get("/", (req, res) => {
+  res.send("🚀 Ride Logger Backend is running");
+});
+
+// --------------------
+// START SERVER
+// --------------------
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
+
 
 
