@@ -190,7 +190,12 @@ app.post("/verify-face", (req, res) => {
   });
 });
 
-app.listen(5000, () => {
+/*app.listen(5000, () => {
   console.log("Face auth server running on port 5000");
+});*/
+// ✅ Use dynamic port for Render
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Face auth server running on port ${PORT}`);
 });
 
