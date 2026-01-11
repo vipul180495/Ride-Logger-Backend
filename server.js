@@ -97,7 +97,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);
 });*/
-
+/*
 import express from "express";
 import cors from "cors";
 import { Resend } from "resend";
@@ -146,5 +146,51 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);
 });
+*/
 
+
+import express from "express";
+import cors from "cors";
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+// TEMP storage (replace with DB later)
+let storedDescriptor = null;
+
+/**
+ * REGISTER FACE
+ */
+app.post("/register-face", (req, res) => {
+  const { descriptor } = req.body;
+
+  if (!descriptor || descriptor.length !== 128) {
+    return res.status(400).json({ error: "Invalid descriptor" });
+  }
+
+  storedDescriptor = descriptor;
+  console.log("Face registered");
+
+  res.json({ success: true });
+});
+
+/**
+ * VERIFY FACE
+ */
+app.post("/verify-face", (req, res) => {
+  const { descriptor } = req.body;
+
+  if (!storedDescriptor) {
+    return res.status(400).json({ error: "No face registered" });
+  }
+
+  res.json({
+    storedDescriptor
+  });
+});
+
+app.listen(5000, () => {
+  console.log("Face auth server running on port 5000");
+});
 

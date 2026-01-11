@@ -7,9 +7,10 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "body-parser": "^2.2.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
-    "express": "^4.21.2",
+    "express": "^4.22.1",
     "resend": "^2.1.0"
   },
   "keywords": [],
