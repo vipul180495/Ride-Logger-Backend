@@ -199,6 +199,9 @@ import express from "express";
 import cors from "cors";
 import nodemailer from "nodemailer";
 import * as faceapi from "face-api.js";
+import dotenv from "dotenv";
+dotenv.config();
+
 
 const app = express();
 app.use(cors());
